@@ -9,7 +9,24 @@
 {% for v in vehicles if v.id in tot %}{% set t=tot[v.id] %}<tr><td>{{v.number}}</td><td>{{t.booking}}</td><td>{{t.fuel}}</td><td>{{t.kharcha}}</td><td><b>{{t.booking-t.fuel-t.kharcha}}</b></td></tr>{% else %}<tr><td colspan="5" class="mut">اس مہینے کوئی حساب نہیں۔</td></tr>{% endfor %}</table></div>
 <h3>روزانہ اندراج</h3><div class="tw"><table><tr><th>تاریخ</th><th>گاڑی</th><th>ڈرائیور</th><th>قسم</th><th>رقم</th><th>تفصیل</th></tr>
 {% for e in es %}<tr><td>{{e.day}}</td><td>{{vn[e.vehicle_id]}}</td><td>{{dn.get(e.driver_id,"")}}</td><td><span class="bd {{e.kind}}">{{K[e.kind]}}</span></td><td>{{e.amount}}</td><td>{{e.note}}</td></tr>{% else %}<tr><td colspan="6" class="mut">اس مہینے کوئی اندراج نہیں۔</td></tr>{% endfor %}</table></div>
-<div class="noprint"><h3>ڈرائیور جوڑیں</h3><form method="post" action="/link" class="card"><input name="phone" placeholder="ڈرائیور کا فون نمبر" required><button>جوڑیں</button>
-{% for d in drivers %}<p class="ok">{{d.name}} ({{d.phone}})</p>{% endfor %}</form>
-<h3>گاڑی شامل کریں</h3><form method="post" action="/vehicle" class="card"><input name="number" placeholder="گاڑی نمبر" required><select name="driver_id"><option value="">ڈرائیور منتخب کریں</option>{% for d in drivers %}<option value="{{d.id}}">{{d.name}}</option>{% endfor %}</select><button>شامل کریں</button></form></div>
+
+<div class="noprint">
+<h3>نئی گاڑی اور ڈرائیور شامل کریں</h3>
+<form method="post" action="/vehicle" class="card">
+  <label>گاڑی نمبر<input name="number" placeholder="مثلاً: ABC-123" required></label>
+  <hr>
+  <p class="mut">ڈرائیور کی تفصیل (اختیاری — بعد میں بھی دے سکتے ہیں)</p>
+  <label>ڈرائیور کا نام<input name="driver_name" placeholder="نام"></label>
+  <label>ڈرائیور کا فون نمبر<input name="driver_phone" inputmode="tel" placeholder="03xx-xxxxxxx"></label>
+  <label>ڈرائیور کا پاسورڈ<input name="driver_pw" type="password" placeholder="کم از کم 4 حروف"></label>
+  <button>شامل کریں</button>
+</form>
+
+{% if drivers %}
+<h3>آپ کے ڈرائیور</h3>
+<div class="card">
+{% for d in drivers %}<p class="ok">{{d.name}} — {{d.phone}}</p>{% endfor %}
+</div>
+{% endif %}
+</div>
 {% endblock %}

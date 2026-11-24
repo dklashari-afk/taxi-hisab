@@ -11,7 +11,6 @@ app.permanent_session_lifetime = dt.timedelta(days=365)
 
 # --- Database URL ---
 url = os.environ.get("DATABASE_URL", "sqlite:///local.db")
-# SQLAlchemy 2.x: postgres:// ko postgresql:// mein badalna zaroori hai
 url = url.replace("postgres://", "postgresql://", 1)
 app.config.update(
     SQLALCHEMY_DATABASE_URI=url,
@@ -27,13 +26,14 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(80)); phone = db.Column(db.String(20), unique=True)
     pw = db.Column(db.String(300)); role = db.Column(db.String(10))
-class Link(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    owner_id = db.Column(db.Integer, db.ForeignKey("user.id")); driver_id = db.Column(db.Integer, db.ForeignKey("user.id"))
+    # driver ke liye: kis malik ka driver hai. owner ke liye None.
+    owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
 class Vehicle(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     owner_id = db.Column(db.Integer, db.ForeignKey("user.id")); number = db.Column(db.String(30))
     driver_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+
 class Entry(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     uid = db.Column(db.String(60), unique=True)
@@ -41,7 +41,6 @@ class Entry(db.Model):
     day = db.Column(db.Date); kind = db.Column(db.String(10)); amount = db.Column(db.Integer); note = db.Column(db.String(200))
 
 # --- DB init (Vercel serverless) ---
-# Har cold start par create_all chalana risky hai. Ek flag use karte hain.
 _db_ready = False
 def _ensure_db():
     global _db_ready
@@ -58,7 +57,6 @@ def _ensure_db():
 def _before():
     _ensure_db()
 
-# --- Manual init route (first deploy ke baad ek dafa call karein) ---
 @app.route("/init-db")
 def init_db():
     try:
@@ -89,24 +87,27 @@ def index():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
+    """Sirf malik (owner) register kar sakta hai. Driver malik banata hai."""
     if request.method == "POST":
         f = request.form; phone = f["phone"].strip()
         if User.query.filter_by(phone=phone).first():
             flash("یہ فون نمبر پہلے سے موجود ہے۔ لاگ ان کریں۔")
         else:
-            u = User(name=f["name"].strip(), phone=phone, pw=generate_password_hash(f["pw"]), role="owner" if f["role"] == "owner" else "driver")
+            u = User(name=f["name"].strip(), phone=phone,
+                     pw=generate_password_hash(f["pw"]), role="owner")
             db.session.add(u); db.session.commit()
             session.permanent = True; session["uid"] = u.id
-            return redirect("/")
+            return redirect("/owner")
     return render_template("auth.html", reg=True, u=None)
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    """Malik aur driver dono yahin se login karte hain."""
     if request.method == "POST":
         u = User.query.filter_by(phone=request.form["phone"].strip()).first()
         if u and check_password_hash(u.pw, request.form["pw"]):
             session.permanent = True; session["uid"] = u.id
-            return redirect("/")
+            return redirect("/owner" if u.role == "owner" else "/driver")
         flash("فون نمبر یا پاسورڈ غلط ہے۔")
     return render_template("auth.html", reg=False, u=None)
 
@@ -114,27 +115,33 @@ def login():
 def logout():
     session.clear(); return redirect("/login")
 
-@app.route("/link", methods=["POST"])
-def link():
-    u = me()
-    if not u: return redirect("/login")
-    o = User.query.filter_by(phone=request.form["phone"].strip()).first()
-    want = "driver" if u.role == "owner" else "owner"
-    if not o or o.role != want:
-        flash("اس نمبر کا %s اکاؤنٹ نہیں ملا۔" % ("ڈرائیور" if want == "driver" else "مالک"))
-    else:
-        ow, dr = (u, o) if u.role == "owner" else (o, u)
-        if not Link.query.filter_by(owner_id=ow.id, driver_id=dr.id).first():
-            db.session.add(Link(owner_id=ow.id, driver_id=dr.id)); db.session.commit()
-        flash("جڑ گئے: " + o.name)
-    return redirect("/")
-
 @app.route("/vehicle", methods=["POST"])
 @need("owner")
 def vehicle(u):
-    d = request.form.get("driver_id", type=int)
-    if d and not Link.query.filter_by(owner_id=u.id, driver_id=d).first(): d = None
-    db.session.add(Vehicle(owner_id=u.id, number=request.form["number"].strip(), driver_id=d)); db.session.commit()
+    """Malik gari add karta hai, saath mein driver bhi bana sakta hai."""
+    number = request.form["number"].strip()
+    d_name = request.form.get("driver_name", "").strip()
+    d_phone = request.form.get("driver_phone", "").strip()
+    d_pw = request.form.get("driver_pw", "").strip()
+
+    driver_id = None
+    if d_phone and d_pw:
+        existing = User.query.filter_by(phone=d_phone).first()
+        if existing:
+            # agar yeh driver pehle se isi malik ka hai to wahi use karo
+            if existing.role != "driver" or existing.owner_id != u.id:
+                flash("یہ نمبر کسی اور اکاؤنٹ سے منسلک ہے۔")
+                return redirect("/owner")
+            driver_id = existing.id
+        else:
+            d = User(name=d_name or "ڈرائیور", phone=d_phone,
+                     pw=generate_password_hash(d_pw), role="driver", owner_id=u.id)
+            db.session.add(d); db.session.flush()
+            driver_id = d.id
+
+    db.session.add(Vehicle(owner_id=u.id, number=number, driver_id=driver_id))
+    db.session.commit()
+    flash("گاڑی شامل ہو گئی۔")
     return redirect("/owner")
 
 @app.route("/owner")
@@ -152,7 +159,7 @@ def owner(u):
         tot.setdefault(e.vehicle_id, {"booking": 0, "fuel": 0, "kharcha": 0})[e.kind] += e.amount
     g = {"booking": 0, "fuel": 0, "kharcha": 0}
     for e in es: g[e.kind] += e.amount
-    drivers = [db.session.get(User, l.driver_id) for l in Link.query.filter_by(owner_id=u.id)]
+    drivers = User.query.filter_by(owner_id=u.id, role="driver").all()
     return render_template("owner.html", g=g, u=u, month=month, vid=vid, vehicles=vehicles, es=es, tot=tot, drivers=drivers,
                            vn={v.id: v.number for v in vehicles}, dn={d.id: d.name for d in drivers}, K=KIND)
 
@@ -160,8 +167,8 @@ def owner(u):
 @need("driver")
 def driver(u):
     vs = [{"id": v.id, "n": v.number} for v in Vehicle.query.filter_by(driver_id=u.id)]
-    owners = [db.session.get(User, l.owner_id) for l in Link.query.filter_by(driver_id=u.id)]
-    return render_template("driver.html", u=u, vs=vs, owners=owners)
+    owner = db.session.get(User, u.owner_id) if u.owner_id else None
+    return render_template("driver.html", u=u, vs=vs, owner=owner)
 
 @app.route("/api/sync", methods=["POST"])
 def sync():
@@ -187,7 +194,6 @@ def sw():
     r.headers["Service-Worker-Allowed"] = "/"
     return r
 
-# health check (optional, Vercel ke liye acha rahega)
 @app.route("/healthz")
 def healthz():
     return "ok"
