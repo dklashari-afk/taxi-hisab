@@ -166,9 +166,7 @@ def owner(u):
 @app.route("/driver")
 @need("driver")
 def driver(u):
-    vs = [{"id": v.id, "n": v.number} for v in Vehicle.query.filter_by(driver_id=u.id)]
-    owner = db.session.get(User, u.owner_id) if u.owner_id else None
-    return render_template("driver.html", u=u, vs=vs, owner=owner)
+    return redirect("/static/driver.html")
 
 @app.route("/api/sync", methods=["POST"])
 def sync():

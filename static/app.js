@@ -1,4 +1,3 @@
-// Supabase client SDK import karein (CDN)
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
 const supabaseUrl = 'https://ynhojvxzyutnutojtoof.supabase.co';
@@ -8,7 +7,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const $ = s => document.querySelector(s);
 const NAMES = { booking: "بکنگ", fuel: "فیول", kharcha: "خرچہ" };
 
-// IndexedDB setup (Dexie.js ke baghair, native API)
+// ---------- IndexedDB ----------
 const DB_NAME = 'taxi_offline';
 const DB_VERSION = 1;
 
@@ -56,7 +55,7 @@ async function deletePending(uid) {
   });
 }
 
-// UI update
+// ---------- UI ----------
 async function show() {
   const pending = await getPending();
   $("#pend").textContent = pending.length;
@@ -65,10 +64,49 @@ async function show() {
   ).join('');
 }
 
-// Sync function
+function updateNetMsg() {
+  const m = $("#netMsg");
+  if (!navigator.onLine) {
+    m.style.display = "block";
+    m.textContent = "آف لائن موڈ: ڈیٹا محفوظ ہو رہا ہے، انٹرنیٹ آنے پر خود بھیج دیا جائے گا";
+  } else {
+    m.style.display = "none";
+  }
+}
+
+// ---------- Vehicle list (Supabase se) ----------
+async function loadVehicles() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    $("#vehicleSelect").innerHTML = '<option value="">پہلے لاگ ان کریں</option>';
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from('vehicles')
+    .select('id, number')
+    .eq('driver_id', session.user.id);
+
+  if (error || !data || !data.length) {
+    $("#vehicleSelect").innerHTML = '<option value="">کوئی گاڑی نہیں ملی</option>';
+    return;
+  }
+
+  $("#vehicleSelect").innerHTML = data
+    .map(v => `<option value="${v.id}">${v.number}</option>`)
+    .join('');
+}
+
+// ---------- Sync ----------
 async function sync() {
   const pending = await getPending();
   if (!pending.length || !navigator.onLine) return;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    $("#st").textContent = "لاگ ان کریں تاکہ ڈیٹا بھیج سکیں";
+    return;
+  }
 
   for (const entry of pending) {
     try {
@@ -78,7 +116,8 @@ async function sync() {
         kind: entry.kind,
         amount: entry.amount,
         note: entry.note,
-        uid: entry.uid
+        uid: entry.uid,
+        driver_id: session.user.id
       });
       if (!error) {
         await deletePending(entry.uid);
@@ -93,11 +132,14 @@ async function sync() {
   show();
 }
 
-// Form submit
+// ---------- Form submit ----------
 $("#f").onsubmit = async (e) => {
   e.preventDefault();
   const f = e.target;
-  if (!f.v.value) return;
+  if (!f.v.value) {
+    $("#st").textContent = "پہلے گاڑی منتخب کریں";
+    return;
+  }
   const k = f.kind.value;
 
   const entry = {
@@ -109,28 +151,27 @@ $("#f").onsubmit = async (e) => {
     note: f.note.value
   };
 
-  // Pehle local mein save
   await savePending(entry);
   f.amt.value = "";
   f.note.value = "";
   $("#st").textContent = NAMES[k] + " محفوظ ہو گیا";
   show();
-
-  // Phir sync try karein
   sync();
 };
 
-// Network events
-addEventListener("online", sync);
+// ---------- Events ----------
+addEventListener("online", () => { updateNetMsg(); sync(); });
+addEventListener("offline", updateNetMsg);
 setInterval(sync, 30000);
 
-// Kind buttons (purana logic)
 document.querySelectorAll(".kind").forEach(b => b.onclick = () => {
   $("#f").kind.value = b.dataset.k;
   document.querySelectorAll(".kind").forEach(x => x.classList.toggle("on", x == b));
 });
 $("#day").value = new Date().toISOString().slice(0, 10);
 
-// Initial
+// ---------- Init ----------
+updateNetMsg();
 show();
 sync();
+loadVehicles();
