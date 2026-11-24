@@ -5,7 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.pool import NullPool
 from werkzeug.security import generate_password_hash, check_password_hash
 
-app = Flask(__name__)
+app = Flask(__name__, instance_path='/tmp/instance')
 app.secret_key = os.environ.get("SECRET_KEY", "change-me")
 app.permanent_session_lifetime = dt.timedelta(days=365)
 
