@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block c %}
+<form class="card noprint filt" method="get"><input type="month" name="m" value="{{month}}"><select name="v"><option value="">تمام گاڑیاں</option>{% for v in vehicles %}<option value="{{v.id}}" {{'selected' if v.id==vid}}>{{v.number}}</option>{% endfor %}</select><button>دکھائیں</button><button type="button" class="ghost" onclick="print()">پرنٹ</button></form>
+<div class="sum">
+<div class="s g"><span class="ic"><svg viewBox="0 0 24 24"><path d="M5 16l1.6-5a2 2 0 0 1 1.9-1.4h7a2 2 0 0 1 1.9 1.4L19 16M4 16h16v3h-2v-1.5H6V19H4zM7.5 13h9"/></svg></span><div><small>کل بکنگ</small><b>{{g.booking}}</b></div></div>
+<div class="s o"><span class="ic"><svg viewBox="0 0 24 24"><path d="M5 20V5a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v15M4 20h11M14 9h2.5a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V8l-3-3M7 8h5"/></svg></span><div><small>فیول</small><b>{{g.fuel}}</b></div></div>
+<div class="s r"><span class="ic"><svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6"/></svg></span><div><small>خرچہ</small><b>{{g.kharcha}}</b></div></div>
+<div class="s n"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 7h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 7l12-3v3M16 14h3"/></svg></span><div><small>خالص بچت</small><b>{{g.booking-g.fuel-g.kharcha}}</b></div></div></div>
+<h3>گاڑی کے حساب سے</h3><div class="tw"><table><tr><th>گاڑی</th><th>بکنگ</th><th>فیول</th><th>خرچہ</th><th>بچت</th></tr>
+{% for v in vehicles if v.id in tot %}{% set t=tot[v.id] %}<tr><td>{{v.number}}</td><td>{{t.booking}}</td><td>{{t.fuel}}</td><td>{{t.kharcha}}</td><td><b>{{t.booking-t.fuel-t.kharcha}}</b></td></tr>{% else %}<tr><td colspan="5" class="mut">اس مہینے کوئی حساب نہیں۔</td></tr>{% endfor %}</table></div>
+<h3>روزانہ اندراج</h3><div class="tw"><table><tr><th>تاریخ</th><th>گاڑی</th><th>ڈرائیور</th><th>قسم</th><th>رقم</th><th>تفصیل</th></tr>
+{% for e in es %}<tr><td>{{e.day}}</td><td>{{vn[e.vehicle_id]}}</td><td>{{dn.get(e.driver_id,"")}}</td><td><span class="bd {{e.kind}}">{{K[e.kind]}}</span></td><td>{{e.amount}}</td><td>{{e.note}}</td></tr>{% else %}<tr><td colspan="6" class="mut">اس مہینے کوئی اندراج نہیں۔</td></tr>{% endfor %}</table></div>
+<div class="noprint"><h3>ڈرائیور جوڑیں</h3><form method="post" action="/link" class="card"><input name="phone" placeholder="ڈرائیور کا فون نمبر" required><button>جوڑیں</button>
+{% for d in drivers %}<p class="ok">{{d.name}} ({{d.phone}})</p>{% endfor %}</form>
+<h3>گاڑی شامل کریں</h3><form method="post" action="/vehicle" class="card"><input name="number" placeholder="گاڑی نمبر" required><select name="driver_id"><option value="">ڈرائیور منتخب کریں</option>{% for d in drivers %}<option value="{{d.id}}">{{d.name}}</option>{% endfor %}</select><button>شامل کریں</button></form></div>
+{% endblock %}

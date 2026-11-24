@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% block c %}
+<section class="hero"><span class="mark big-mark ic"><svg viewBox="0 0 24 24"><path d="M5 16l1.6-5a2 2 0 0 1 1.9-1.4h7a2 2 0 0 1 1.9 1.4L19 16M4 16h16v3h-2v-1.5H6V19H4zM7.5 13h9"/></svg></span><h1>ٹیکسی حساب</h1><p>ڈرائیور کا روز کا حساب، مالک کی نظر میں</p></section>
+
+{% with msgs = get_flashed_messages() %}
+{% if msgs %}
+<div class="card flash">
+  {% for m in msgs %}<p>{{ m }}</p>{% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+<form method="post" class="card" autocomplete="on">
+<h2>{{ "نیا اکاؤنٹ بنائیں" if reg else "لاگ ان کریں" }}</h2>
+{% if reg %}<label>نام<input name="name" required autocomplete="name"></label>{% endif %}
+<label>فون نمبر<input name="phone" inputmode="tel" required autocomplete="tel"></label>
+<label>پاسورڈ<input name="pw" type="password" required autocomplete="{{ 'new-password' if reg else 'current-password' }}"></label>
+{% if reg %}<label>آپ کون ہیں؟<select name="role"><option value="driver">ڈرائیور</option><option value="owner">مالک</option></select></label>{% endif %}
+<button class="big">{{ "اکاؤنٹ بنائیں" if reg else "لاگ ان" }}</button>
+<p class="alt"><a href="{{ '/login' if reg else '/register' }}">{{ "پہلے سے اکاؤنٹ ہے؟ لاگ ان کریں" if reg else "نیا اکاؤنٹ بنائیں" }}</a></p></form>
+{% endblock %}
